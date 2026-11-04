@@ -1,5 +1,6 @@
-# Only the producer is custom-built; every other service in this project
-# uses an official, unmodified image (see docker-compose.yml).
+# Custom ingestion image. Spark is the only other built image and only
+# extends the official apache/spark image; Kafka, Postgres and Grafana run
+# unmodified official images (see docker-compose.yml).
 FROM python:3.12-slim
 
 WORKDIR /app

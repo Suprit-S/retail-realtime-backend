@@ -1,0 +1,19 @@
+# Provisioned datasource: Grafana connects as the read-only report role.
+apiVersion: 1
+
+datasources:
+  - name: RetailPostgres
+    uid: retail-pg
+    type: grafana-postgresql-datasource
+    access: proxy
+    url: postgres:5432
+    user: ${POSTGRES_REPORT_USER}
+    isDefault: true
+    editable: false
+    jsonData:
+      database: ${POSTGRES_DB}
+      sslmode: disable
+      postgresVersion: 1600
+      timescaledb: false
+    secureJsonData:
+      password: ${POSTGRES_REPORT_PASSWORD}

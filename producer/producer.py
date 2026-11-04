@@ -14,7 +14,6 @@ import sys
 import time
 from datetime import datetime
 
-from dateutil import parser as dateparser
 from kafka import KafkaProducer
 
 logging.basicConfig(
@@ -86,15 +85,36 @@ def connect_producer() -> KafkaProducer:
     sys.exit(1)
 
 
-def parse_row(row: dict) -> dict | None:
+def parse_event_time(raw_date: str) -> datetime | None:
+    """Parse InvoiceDate without guessing the day/month order.
+
+    The CSV produced by data/README.md (pandas to_csv) writes ISO dates such
+    as "2009-12-01 07:45:00". An earlier version used dateutil with
+    dayfirst=True, which silently read that as 12 January 2009, so every
+    date with a day <= 12 landed in the wrong month and was then dropped by
+    the Spark watermark. ISO is now parsed strictly; the UK day-first
+    format of the original Excel export is the only accepted fallback.
+    """
+    try:
+        return datetime.fromisoformat(raw_date)
+    except ValueError:
+        pass
+    for fmt in ("%d/%m/%Y %H:%M", "%d/%m/%Y %H:%M:%S"):
+        try:
+            return datetime.strptime(raw_date, fmt)
+        except ValueError:
+            continue
+    return None
+
+
+def parse_row(row: dict) -> tuple[dict, datetime] | None:
     """Turn one CSV row into a JSON-ready event, or None if it's unusable."""
     invoice_no = (row.get("Invoice") or "").strip()
     raw_date = (row.get("InvoiceDate") or "").strip()
     if not invoice_no or not raw_date:
         return None
-    try:
-        event_time = dateparser.parse(raw_date, dayfirst=True)
-    except (ValueError, OverflowError):
+    event_time = parse_event_time(raw_date)
+    if event_time is None:
         return None
     quantity_raw = (row.get("Quantity") or "").strip()
     price_raw = (row.get("Price") or "").strip()
@@ -153,7 +173,10 @@ def main() -> None:
                 sleep_for = min(sleep_for, MAX_SLEEP_SECONDS)
                 if sleep_for > 0:
                     time.sleep(sleep_for)
-            prev_event_time = event_time
+            # Only move the replay clock forward: an out-of-order row is
+            # sent immediately instead of resetting the pacing reference.
+            if prev_event_time is None or event_time > prev_event_time:
+                prev_event_time = event_time
 
             producer.send(TOPIC, key=event["invoice_no"], value=event)
             sent += 1

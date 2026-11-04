@@ -1,0 +1,11 @@
+# Loads every dashboard JSON in /etc/grafana/dashboards at startup.
+apiVersion: 1
+
+providers:
+  - name: retail
+    folder: ""
+    type: file
+    disableDeletion: true
+    allowUiUpdates: false
+    options:
+      path: /etc/grafana/dashboards

@@ -1,0 +1,14 @@
+# secrets
+.env
+
+# dataset (each machine supplies its own copy, see data/README.md)
+data/*.csv
+data/*.xlsx
+
+# python / local runs
+__pycache__/
+*.pyc
+.pytest_cache/
+spark-warehouse/
+metastore_db/
+checkpoints/
